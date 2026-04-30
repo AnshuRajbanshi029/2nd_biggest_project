@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-console.log('%c[BikeViewer v39 – GLB texture flip fixed]', 'background:#22cc88;color:#fff;padding:4px 8px;font-weight:bold;border-radius:3px');
+console.log('%c[BikeViewer v40 – car A/D un-inverted]', 'background:#22cc88;color:#fff;padding:4px 8px;font-weight:bold;border-radius:3px');
 
 const app = document.querySelector('#app');
 const loaderOverlay = document.querySelector('#loader');
@@ -387,7 +387,11 @@ function collectCarWheels(root) {
         mesh: object,
         isFront: name.includes('front'),
         spin: 0,
-        kind: 'car'
+        kind: 'car',
+        // After the global A/D inversion (v33), positive steer.angle yaws the
+        // car wheels left around world Y. Negate so D yaws right, matching
+        // the bike + jeep.
+        steerSign: -1
       });
     }
   });
