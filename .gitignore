@@ -3,6 +3,9 @@
 
 # Local debug dumps (regenerated on demand by probe_*.py / probe_*.js)
 wheel_dump.json
+hub_dump.json
+jeep_dump.json
+jeep_doors_after.png
 _jeep_tex_*
 
 # OS / editor cruft
