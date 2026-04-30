@@ -1,0 +1,14 @@
+# Blender autosave / backup
+*.blend1
+
+# Local debug dumps (regenerated on demand by probe_*.py / probe_*.js)
+wheel_dump.json
+_jeep_tex_*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/
+node_modules/
