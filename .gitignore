@@ -5,7 +5,11 @@
 wheel_dump.json
 hub_dump.json
 jeep_dump.json
-jeep_doors_after.png
+doors_*_log.json
+doors_now.json
+jeep_doors_*.png
+jeep_view_*.png
+4x4_jeep_original.glb
 _jeep_tex_*
 
 # OS / editor cruft

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-console.log('%c[BikeViewer v41 – Jeep doors closed]', 'background:#22cc88;color:#fff;padding:4px 8px;font-weight:bold;border-radius:3px');
+console.log('%c[BikeViewer v42 – Jeep doors closed v2]', 'background:#22cc88;color:#fff;padding:4px 8px;font-weight:bold;border-radius:3px');
 
 const app = document.querySelector('#app');
 const loaderOverlay = document.querySelector('#loader');
@@ -259,7 +259,7 @@ Promise.all([
     bikeProgress.total = event.total;
     updateProgress();
   }),
-  loadGlbAsThreeScene('./4x4_jeep.glb?v=2', (event) => {
+  loadGlbAsThreeScene('./4x4_jeep.glb?v=3', (event) => {
     if (!event.total) return;
     jeepProgress.loaded = event.loaded;
     jeepProgress.total = event.total;
