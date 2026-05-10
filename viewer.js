@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
-console.log('%c[BikeViewer v42 – Jeep doors closed v2]', 'background:#22cc88;color:#fff;padding:4px 8px;font-weight:bold;border-radius:3px');
-
 const app = document.querySelector('#app');
 const loaderOverlay = document.querySelector('#loader');
 const progressBar = document.querySelector('#progress');
@@ -62,9 +60,33 @@ const cars = [
   },
   {
     type: 'jeep',
-    title: '4x4 Jeep',
-    description: 'Rugged off-road 4x4. All four wheels roll, the front pair steers when you press A/D.',
-    targetSize: 3.4
+    title: '2007 Jeep Wrangler Rubicon',
+    description: 'Imported Wrangler Rubicon model. All four wheels roll, and the front pair steers when you press A/D.',
+    targetSize: 3.8
+  },
+  {
+    type: 'formula',
+    title: 'Formula 1 Generico',
+    description: 'Open-wheel formula car imported into the showroom. Four tires roll, and the front pair steers when you press A/D.',
+    targetSize: 3.6
+  },
+  {
+    type: 'rickshaw',
+    title: 'Bajaj Auto Rickshaw',
+    description: 'Classic yellow three-wheeler tuk-tuk with full textured cabin and a custom brake-pedal assembly mounted on the handlebar.',
+    targetSize: 3.0
+  },
+  {
+    type: 'bmw',
+    title: 'AC - BMW 1M',
+    description: 'Sketchfab BMW 1M coupe with glossy black paint, transparent glass, textured interior, and four rolling/steering wheels.',
+    targetSize: 3.7
+  },
+  {
+    type: 'ferrari',
+    title: '2020 Ferrari Roma',
+    description: 'Elegant Ferrari Roma coupe with polished grey paint, transparent glass, detailed interior, badges, wheels, and brake calipers.',
+    targetSize: 3.8
   }
 ];
 
@@ -190,6 +212,14 @@ let bikeContentRoot;
 let bikeLeanAxis = null;
 let jeepRoot = null;
 let jeepPivot = null;
+let formulaRoot = null;
+let formulaPivot = null;
+let rickshawRoot = null;
+let rickshawPivot = null;
+let bmwRoot = null;
+let bmwPivot = null;
+let ferrariRoot = null;
+let ferrariPivot = null;
 let carRoots = [];
 let carWheels = [];
 let steerStates = [];
@@ -239,12 +269,18 @@ cars.forEach((car, index) => {
 const carsProgress = { loaded: 0, total: 0 };
 const bikeProgress = { loaded: 0, total: 0 };
 const jeepProgress = { loaded: 0, total: 0 };
+const formulaProgress = { loaded: 0, total: 0 };
+const rickshawProgress = { loaded: 0, total: 0 };
+const bmwProgress = { loaded: 0, total: 0 };
+const ferrariProgress = { loaded: 0, total: 0 };
 function updateProgress() {
-  const total = (carsProgress.total || 0) + (bikeProgress.total || 0) + (jeepProgress.total || 0);
+  const total = (carsProgress.total || 0) + (bikeProgress.total || 0) + (jeepProgress.total || 0) + (formulaProgress.total || 0) + (rickshawProgress.total || 0) + (bmwProgress.total || 0) + (ferrariProgress.total || 0);
   if (!total) return;
-  const loaded = (carsProgress.loaded || 0) + (bikeProgress.loaded || 0) + (jeepProgress.loaded || 0);
+  const loaded = (carsProgress.loaded || 0) + (bikeProgress.loaded || 0) + (jeepProgress.loaded || 0) + (formulaProgress.loaded || 0) + (rickshawProgress.loaded || 0) + (bmwProgress.loaded || 0) + (ferrariProgress.loaded || 0);
   progressBar.style.setProperty('--progress', `${Math.round((loaded / total) * 100)}%`);
 }
+
+const loadedStatusText = 'Loaded 3 cars + Yamaha FZ16 + Wrangler Rubicon + Formula 1 + Bajaj Rickshaw + BMW 1M + Ferrari Roma. Hold A/D to steer.';
 
 Promise.all([
   loadGlbAsThreeScene('./free_racing_car_in_3_styles.glb', (event) => {
@@ -259,13 +295,37 @@ Promise.all([
     bikeProgress.total = event.total;
     updateProgress();
   }),
-  loadGlbAsThreeScene('./4x4_jeep.glb?v=3', (event) => {
+  loadGlbAsThreeScene('./2007_jeep_wrangler_rubicon.glb?v=1', (event) => {
     if (!event.total) return;
     jeepProgress.loaded = event.loaded;
     jeepProgress.total = event.total;
     updateProgress();
+  }),
+  loadGlbAsThreeScene('./formula_1_generico_2.glb?v=1', (event) => {
+    if (!event.total) return;
+    formulaProgress.loaded = event.loaded;
+    formulaProgress.total = event.total;
+    updateProgress();
+  }),
+  loadGlbAsThreeScene('./rickshaw_with_brake.glb?v=74', (event) => {
+    if (!event.total) return;
+    rickshawProgress.loaded = event.loaded;
+    rickshawProgress.total = event.total;
+    updateProgress();
+  }),
+  loadGlbAsThreeScene('./ac_-_bmw_1m_free (1).glb?v=1', (event) => {
+    if (!event.total) return;
+    bmwProgress.loaded = event.loaded;
+    bmwProgress.total = event.total;
+    updateProgress();
+  }),
+  loadGlbAsThreeScene('./2020_ferrari_roma.glb?v=1', (event) => {
+    if (!event.total) return;
+    ferrariProgress.loaded = event.loaded;
+    ferrariProgress.total = event.total;
+    updateProgress();
   })
-]).then(([carsGltf, bikeGltf, jeepGltf]) => {
+]).then(([carsGltf, bikeGltf, jeepGltf, formulaGltf, rickshawGltf, bmwGltf, ferrariGltf]) => {
   try {
     modelRoot = carsGltf.scene;
     scene.add(modelRoot);
@@ -302,6 +362,46 @@ Promise.all([
     scene.add(jeepPivot);
     applyJeepMaterials(jeepRoot);
 
+    formulaRoot = formulaGltf.scene;
+    formulaPivot = new THREE.Group();
+    formulaPivot.add(formulaRoot);
+    scene.add(formulaPivot);
+    applyFormulaMaterials(formulaRoot);
+
+    rickshawRoot = rickshawGltf.scene;
+    rickshawPivot = new THREE.Group();
+    rickshawPivot.add(rickshawRoot);
+    scene.add(rickshawPivot);
+    applyRickshawMaterials(rickshawRoot);
+
+    bmwRoot = bmwGltf.scene;
+    bmwPivot = new THREE.Group();
+    bmwPivot.add(bmwRoot);
+    scene.add(bmwPivot);
+    applyBmwMaterials(bmwRoot);
+
+    ferrariRoot = ferrariGltf.scene;
+    ferrariPivot = new THREE.Group();
+    ferrariPivot.add(ferrariRoot);
+    scene.add(ferrariPivot);
+    applyFerrariMaterials(ferrariRoot);
+
+    // The rickshaw GLB has a chassis pan/skirt that hangs below the tyres
+    // and asymmetric front-vs-rear axle heights, so a naive bbox.min.y rest
+    // tilts the model. We measure the front and rear contact lines once and
+    // cache (1) the tilt angle that levels them and (2) the world-Y line
+    // that should sit on the floor afterwards.
+    rickshawRoot.position.set(0, 0, 0);
+    rickshawRoot.rotation.set(0, 0, 0);
+    rickshawRoot.updateMatrixWorld(true);
+    rickshawRoot.userData.seating = computeRickshawSeating(rickshawRoot);
+    const __s = rickshawRoot.userData.seating;
+    console.log('[showroom] rickshaw seat floor (world Y min):', +__s.seatY.toFixed(4),
+      '  model height:', +__s.modelHeight.toFixed(4),
+      __s.seatY > 0.05 || __s.seatY < -0.05
+        ? '  ⚠ wheel plane not at ground — re-run fix_rickshaw_ground_plane.py'
+        : '  ✓ wheels grounded');
+
     carRoots = cars.map((car, index) => {
       if (car.type === 'car') {
         const root = modelRoot.getObjectByName(car.root);
@@ -318,6 +418,22 @@ Promise.all([
         jeepPivot.visible = false;
         return jeepPivot;
       }
+      if (car.type === 'formula') {
+        formulaPivot.visible = false;
+        return formulaPivot;
+      }
+      if (car.type === 'rickshaw') {
+        rickshawPivot.visible = false;
+        return rickshawPivot;
+      }
+      if (car.type === 'bmw') {
+        bmwPivot.visible = false;
+        return bmwPivot;
+      }
+      if (car.type === 'ferrari') {
+        ferrariPivot.visible = false;
+        return ferrariPivot;
+      }
       return null;
     });
 
@@ -327,6 +443,10 @@ Promise.all([
       if (car.type === 'car') return collectCarWheels(root);
       if (car.type === 'bike') return collectBikeWheels(bikeContentRoot);
       if (car.type === 'jeep') return collectJeepWheels(jeepRoot);
+      if (car.type === 'formula') return collectFormulaWheels(formulaRoot);
+      if (car.type === 'rickshaw') return collectRickshawWheels(rickshawRoot);
+      if (car.type === 'bmw') return collectBmwWheels(bmwRoot);
+      if (car.type === 'ferrari') return collectFerrariWheels(ferrariRoot);
       return [];
     });
 
@@ -334,7 +454,7 @@ Promise.all([
 
     showCar(getInitialCarIndex());
     loaderOverlay.classList.add('is-hidden');
-    status.textContent = 'Loaded 3 cars + Yamaha FZ16 + 4x4 Jeep. Hold A/D to steer (cars yaw, bike leans).';
+    status.textContent = loadedStatusText;
 
     toggleRotateBtn.addEventListener('click', () => {
       wheelsSpinning = !wheelsSpinning;
@@ -347,7 +467,7 @@ Promise.all([
         ? (car.type === 'bike'
             ? 'Tires rolling. Hold A/D to steer the front wheel and lean the bike.'
             : 'Wheels spinning. Hold A/D to steer the front wheels.')
-        : 'Loaded 3 cars + Yamaha FZ16 + 4x4 Jeep. Hold A/D to steer (cars yaw, bike leans).';
+        : loadedStatusText;
       if (!wheelsSpinning) drivingKeys.clear();
     });
   } catch (error) {
@@ -398,6 +518,86 @@ function collectCarWheels(root) {
   return wheels;
 }
 
+function collectRickshawWheels(root) {
+  // The GLB has 3 axle pivots inside Sketchfab_model. Sketchfab_model carries
+  // the Z-up→Y-up rotation that Blender bakes during export, which means the
+  // pivots' parent has a non-identity world quaternion. To keep wheel spin
+  // math trivial and wobble-free, we re-parent each pivot directly to
+  // `rickshawRoot` (which has identity rotation throughout the lifetime of
+  // the viewer). `Object3D.attach` preserves the world transform, so after
+  // re-parenting:
+  //   pivot.parent.worldQuaternion ≈ identity
+  //   pivot.quaternion             ≈ identity (was identity in world too)
+  // and we can simply spin around local +X to get a clean world +X roll.
+  const wheelDefs = [
+    { name: 'rickshaw_wheel_front',  isFront: true  },
+    { name: 'rickshaw_wheel_rear_L', isFront: false },
+    { name: 'rickshaw_wheel_rear_R', isFront: false },
+  ];
+  const wheels = [];
+  const frontSteeringParts = ['Object_15.002', 'Object_17.002'];
+
+  if (root.parent) root.parent.updateWorldMatrix(true, false);
+  root.updateMatrixWorld(true);
+
+  wheelDefs.forEach((def) => {
+    const pivot = root.getObjectByName(def.name);
+    if (!pivot) {
+      console.warn('[showroom] rickshaw wheel pivot missing:', def.name);
+      return;
+    }
+    let steeringGroup = null;
+    if (def.isFront) {
+      const steeringWorldPosition = new THREE.Vector3();
+      const steeringWorldQuaternion = new THREE.Quaternion();
+      const steeringWorldScale = new THREE.Vector3();
+      pivot.getWorldPosition(steeringWorldPosition);
+      pivot.getWorldQuaternion(steeringWorldQuaternion);
+      pivot.getWorldScale(steeringWorldScale);
+
+      steeringGroup = new THREE.Group();
+      steeringGroup.name = 'rickshaw_front_steering_yaw';
+      root.add(steeringGroup);
+      steeringGroup.position.copy(steeringWorldPosition);
+      steeringGroup.quaternion.copy(steeringWorldQuaternion);
+      steeringGroup.scale.copy(steeringWorldScale);
+
+      root.attach(steeringGroup);
+      steeringGroup.updateWorldMatrix(true, false);
+      steeringGroup.attach(pivot);
+
+      frontSteeringParts.forEach((partName) => {
+        const part = root.getObjectByName(partName);
+        if (!part) {
+          console.warn('[showroom] rickshaw front steering part missing:', partName);
+          return;
+        }
+        steeringGroup.attach(part);
+      });
+    } else {
+      root.attach(pivot);
+    }
+    pivot.updateWorldMatrix(true, false);
+
+    wheels.push({
+      mesh: pivot,
+      steeringGroup,
+      isFront: def.isFront,
+      spin: 0,
+      kind: 'rickshaw',
+      axleVec: X_AXIS,
+      steerVec: Y_AXIS,
+      // Match the car/jeep convention: positive steer.angle turns the front
+      // wheel to the driver's right.
+      steerSign: -1,
+    });
+    console.log('[showroom] rickshaw pivot', def.name,
+      'attached → quat:', pivot.quaternion.toArray().map((v) => +v.toFixed(4)),
+      'pos:', pivot.position.toArray().map((v) => +v.toFixed(3)));
+  });
+  return wheels;
+}
+
 function hideBikeNonBikeNodes(root) {
   // Sketchfab scene includes lights (Areas, Points) and a stray Cube — hide non-bike meshes.
   root.traverse((object) => {
@@ -417,25 +617,555 @@ function applyBikeMaterials(root) {
 }
 
 function applyJeepMaterials(root) {
-  // The GLB ships with proper baseColorTexture for Wheel / Body / Optics and
-  // pure-black baseColorFactor for Glass — that's already what we want. Don't
-  // tint or remetallise it; just enable shadows and a calm reflection level.
   root.traverse((object) => {
     if (!object.isMesh) return;
     object.castShadow = true;
     object.receiveShadow = true;
-    const mat = object.material;
-    if (!mat) return;
-    mat.envMapIntensity = 0.6;
+    const original = Array.isArray(object.material) ? object.material[0] : object.material;
+    if (!original) return;
+
+    const matName = (original.name || '').toLowerCase();
+    const baseMap = original.userData?.baseColorTexture || original.map || null;
+    const mrMap = original.userData?.metallicRoughnessTexture || null;
+
+    if (matName === 'wrangluz' || matName === 'wrangluz2') {
+      object.material = new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        map: baseMap,
+        emissive: matName === 'wrangluz2' ? new THREE.Color(0x3b0904) : new THREE.Color(0x111111),
+        emissiveMap: baseMap,
+        emissiveIntensity: matName === 'wrangluz2' ? 0.45 : 0.18,
+        metalness: 0.02,
+        roughness: 0.2,
+        clearcoat: 1,
+        clearcoatRoughness: 0.04,
+        reflectivity: 0.9,
+        envMapIntensity: 1.35,
+        side: THREE.DoubleSide
+      });
+      object.castShadow = false;
+      return;
+    }
+
+    if (matName === 'glass') {
+      original.transparent = true;
+      original.opacity = 0.35;
+      original.depthWrite = false;
+      original.side = THREE.DoubleSide;
+      original.envMapIntensity = 1.2;
+      return;
+    }
+
+    if (matName === 'cromo') {
+      object.material = new THREE.MeshPhysicalMaterial({
+        color: 0xd8dde3,
+        map: baseMap,
+        metalness: 0.35,
+        roughness: 0.12,
+        clearcoat: 1,
+        clearcoatRoughness: 0.03,
+        reflectivity: 1,
+        envMapIntensity: 1.8,
+        side: THREE.DoubleSide
+      });
+      return;
+    }
+
+    original.metalnessMap = mrMap;
+    original.roughnessMap = mrMap;
+    original.side = THREE.DoubleSide;
+    original.envMapIntensity = 0.8;
   });
 }
 
-// The 4x4 Jeep ships as 4 separate "Tire*_Wheel_0" meshes, plus a body-mounted
-// "Body1_Wheel_0" decorative strip. We pick the four with tire-like proportions
-// (axle-thin disc) sitting near the ground, build a pivot per tire, recenter
-// the geometry into local space and parent the mesh under the pivot so we can
-// spin it freely.
+function computeRickshawSeating(root) {
+  // The rickshaw GLB was re-exported from Blender with its wheel plane
+  // already levelled at Z = 0 (see fix_rickshaw_ground_plane.py). Seating
+  // here is therefore trivial: the overall world-Y minimum IS the tyre
+  // contact line. We still do a quick sanity sweep so the console reveals
+  // whether the exported GLB is the "fixed" one (min ≈ 0) or a stale copy
+  // (min significantly non-zero).
+  root.updateMatrixWorld(true);
+  const tempV = new THREE.Vector3();
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  root.traverse((object) => {
+    if (!object.isMesh || !object.geometry) return;
+    const pos = object.geometry.attributes.position;
+    if (!pos) return;
+    for (let i = 0; i < pos.count; i += 1) {
+      tempV.fromBufferAttribute(pos, i).applyMatrix4(object.matrixWorld);
+      if (tempV.y < minY) minY = tempV.y;
+      if (tempV.y > maxY) maxY = tempV.y;
+    }
+  });
+
+  return { seatY: minY, modelHeight: maxY - minY };
+}
+
+function applyRickshawMaterials(root) {
+  // The Bajaj rickshaw GLB ships with full Sketchfab PBR textures (yellow body
+  // panels, black roof, blue cabin upholstery, tire treads) plus the
+  // hand-built brake pipe / pedal materials we authored in Blender. We only
+  // need to enable shadows + give the standard materials a sensible env-map
+  // intensity so the showroom lighting reflects nicely off the painted body.
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    const material = Array.isArray(object.material) ? object.material[0] : object.material;
+    if (!material) return;
+    const materialName = (material.name || '').toLowerCase();
+    const objectName = (object.name || '').toLowerCase();
+
+    if (materialName.includes('glass') || objectName.startsWith('object_23')) {
+      const glassMaterial = new THREE.MeshPhysicalMaterial({
+        color: 0xbfd8ff,
+        transparent: true,
+        opacity: 0.22,
+        transmission: 0.65,
+        thickness: 0.035,
+        ior: 1.45,
+        roughness: 0.04,
+        metalness: 0,
+        clearcoat: 1,
+        clearcoatRoughness: 0.02,
+        reflectivity: 0.9,
+        envMapIntensity: 1.8,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      glassMaterial.name = `${material.name || object.name}_realistic_transparent`;
+      object.material = glassMaterial;
+      object.castShadow = false;
+      return;
+    }
+
+    material.side = THREE.DoubleSide;
+    material.envMapIntensity = 1.0;
+  });
+}
+
+function applyBmwMaterials(root) {
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+
+    const material = Array.isArray(object.material) ? object.material[0] : object.material;
+    if (!material) return;
+
+    const materialName = (material.name || '').toLowerCase();
+    const objectName = (object.name || '').toLowerCase();
+    const key = `${materialName} ${objectName}`;
+
+    material.side = THREE.DoubleSide;
+    material.envMapIntensity = 1.15;
+
+    if (key.includes('livrea')) {
+      object.material = new THREE.MeshPhysicalMaterial({
+        name: `${material.name || object.name}_clean_clearcoat`,
+        color: material.color?.clone() || new THREE.Color(0x080a0a),
+        metalness: 0.05,
+        roughness: 0.18,
+        clearcoat: 1,
+        clearcoatRoughness: 0.06,
+        reflectivity: 0.9,
+        envMapIntensity: 2.1,
+        side: THREE.DoubleSide
+      });
+      return;
+    }
+
+    if (key.includes('vetri') || key.includes('glass')) {
+      material.transparent = true;
+      material.opacity = key.includes('nero') ? 0.42 : 0.28;
+      material.depthWrite = false;
+      material.metalness = 0;
+      material.roughness = 0.03;
+      material.envMapIntensity = 2.0;
+      return;
+    }
+
+    if (key.includes('mirror')) {
+      material.metalness = 0.15;
+      material.roughness = 0.02;
+      material.envMapIntensity = 2.4;
+      return;
+    }
+
+    if (key.includes('fanali') || key.includes('fari') || key.includes('faro') || key.includes('light')) {
+      const emissiveColor = key.includes('posteriori') || key.includes('rear') || key.includes('brake')
+        ? 0xff2818
+        : 0xdbeafe;
+      material.emissive = new THREE.Color(emissiveColor);
+      material.emissiveIntensity = key.includes('posteriori') || key.includes('rear') || key.includes('brake') ? 0.45 : 0.22;
+      material.roughness = Math.min(material.roughness ?? 0.2, 0.18);
+      material.envMapIntensity = 1.7;
+      object.castShadow = false;
+      return;
+    }
+
+    if (key.includes('rim') || key.includes('cromato') || key.includes('metal')) {
+      material.metalness = Math.max(material.metalness ?? 0, 0.25);
+      material.roughness = Math.min(material.roughness ?? 0.25, 0.28);
+      material.envMapIntensity = 1.8;
+    }
+  });
+}
+
+function applyFerrariMaterials(root) {
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+
+    const material = Array.isArray(object.material) ? object.material[0] : object.material;
+    if (!material) return;
+
+    const materialName = (material.name || '').toLowerCase();
+    const objectName = (object.name || '').toLowerCase();
+    const key = `${materialName} ${objectName}`;
+
+    material.side = THREE.DoubleSide;
+    material.envMapIntensity = 1.15;
+
+    if (key.includes('badge')) {
+      material.color = new THREE.Color(0xd6d8dc);
+      material.metalness = 0.08;
+      material.roughness = 0.42;
+      material.envMapIntensity = 0.55;
+      material.emissive = new THREE.Color(0x18191b);
+      material.emissiveIntensity = 0.16;
+      object.castShadow = false;
+      object.receiveShadow = false;
+      return;
+    }
+
+    if (key.includes('manufacturerplate')) {
+      material.metalness = 0.02;
+      material.roughness = 0.5;
+      material.envMapIntensity = 0.45;
+      object.castShadow = false;
+      return;
+    }
+
+    if (key.includes('paint')) {
+      object.material = new THREE.MeshPhysicalMaterial({
+        name: `${material.name || object.name}_showroom_clearcoat`,
+        color: material.color?.clone() || new THREE.Color(0x4b5050),
+        metalness: 0.12,
+        roughness: 0.16,
+        clearcoat: 1,
+        clearcoatRoughness: 0.05,
+        reflectivity: 0.95,
+        envMapIntensity: 2.2,
+        side: THREE.DoubleSide
+      });
+      return;
+    }
+
+    if (key.includes('window') || key.includes('glass')) {
+      material.transparent = true;
+      material.opacity = key.includes('red_glass') ? 0.38 : 0.3;
+      material.depthWrite = false;
+      material.metalness = 0;
+      material.roughness = 0.02;
+      material.envMapIntensity = 2.0;
+      return;
+    }
+
+    if (key.includes('light')) {
+      material.emissive = new THREE.Color(0xe8f3ff);
+      material.emissiveIntensity = 0.2;
+      material.roughness = Math.min(material.roughness ?? 0.2, 0.18);
+      material.envMapIntensity = 1.7;
+      object.castShadow = false;
+      return;
+    }
+
+    if (key.includes('calliper')) {
+      material.roughness = 0.3;
+      material.envMapIntensity = 1.3;
+      return;
+    }
+
+    if (key.includes('wheel') || key.includes('chrome')) {
+      material.metalness = Math.max(material.metalness ?? 0, 0.25);
+      material.roughness = Math.min(material.roughness ?? 0.4, 0.35);
+      material.envMapIntensity = 1.45;
+    }
+  });
+}
+
+function applyFormulaMaterials(root) {
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    const material = Array.isArray(object.material) ? object.material[0] : object.material;
+    if (!material) return;
+    material.side = THREE.DoubleSide;
+    material.envMapIntensity = 1.0;
+    material.roughness = Math.min(material.roughness ?? 0.45, 0.48);
+    if ((material.name || '').toLowerCase() === 'material_1') {
+      material.metalness = 0.18;
+      material.roughness = 0.34;
+    }
+  });
+}
+
+function collectFormulaWheels(formulaContent) {
+  const indexedMeshes = [];
+  formulaContent.traverse((object) => {
+    if (object.isMesh && object.geometry?.index) indexedMeshes.push(object);
+  });
+
+  const candidates = [];
+  const componentCache = new Map();
+  indexedMeshes.forEach((mesh) => {
+    const materialName = (mesh.material?.name || '').toLowerCase();
+    if (materialName !== 'material_3' && materialName !== 'material_4') return;
+    const comps = findConnectedComponents(mesh.geometry);
+    componentCache.set(mesh, comps);
+    if (materialName !== 'material_4') return;
+    comps.forEach((comp) => {
+      if (comp.verts.length < 700) return;
+      const sorted = [comp.sizeX, comp.sizeY, comp.sizeZ].sort((a, b) => a - b);
+      const isDisc = sorted[0] / sorted[2] > 0.3
+        && sorted[0] / sorted[2] < 0.72
+        && sorted[1] / sorted[2] > 0.85
+        && sorted[2] > 0.2;
+      if (!isDisc) return;
+      candidates.push({ mesh, comp, radius: sorted[2] / 2 });
+    });
+  });
+
+  candidates.sort((a, b) => b.comp.verts.length - a.comp.verts.length);
+  const tireCandidates = candidates.slice(0, 4);
+  if (tireCandidates.length !== 4) {
+    console.warn('[formula] expected 4 tires, found', tireCandidates.length);
+    return [];
+  }
+
+  const splitX = tireCandidates.reduce((sum, item) => sum + item.comp.cx, 0) / tireCandidates.length;
+  const componentsByMesh = new Map();
+  const wheels = tireCandidates.map(({ mesh, comp, radius }) => {
+    const meshComponents = componentsByMesh.get(mesh) || [];
+    meshComponents.push(comp.vertSet);
+    componentsByMesh.set(mesh, meshComponents);
+
+    const pivot = new THREE.Group();
+    // The Formula GLB's authored X axis is opposite the visible nose direction
+    // after its Sketchfab root matrix is applied in the showroom.
+    const isFront = comp.cx < splitX;
+    pivot.name = `FormulaWheel_${isFront ? 'Front' : 'Rear'}_${comp.cy > 0 ? 'Left' : 'Right'}`;
+    pivot.position.set(comp.cx, comp.cy, comp.cz);
+    mesh.parent.add(pivot);
+
+    const tireMesh = extractComponentToPivotedMesh(mesh, comp, comp.cx, comp.cy, comp.cz);
+    tireMesh.name = `${pivot.name}_tire`;
+    pivot.add(tireMesh);
+
+    return {
+      mesh: pivot,
+      tireComp: comp,
+      isFront,
+      spin: 0,
+      kind: 'formula',
+      axleVec: Y_AXIS,
+      steerVec: Z_AXIS,
+      steerSign: -1,
+      radius,
+      axleHalfWidth: comp.sizeY * 0.5,
+      partsCount: 1
+    };
+  });
+
+  // The Formula GLB stores each tire as many separate pieces: rubber shell,
+  // sidewall lettering, rim, spokes, hub, brake details. Move every component
+  // that sits inside a wheel disc into that wheel's pivot so it all spins as
+  // one wheel instead of only the black rubber rotating.
+  indexedMeshes.forEach((mesh) => {
+    const materialName = (mesh.material?.name || '').toLowerCase();
+    if (materialName !== 'material_3' && materialName !== 'material_4') return;
+    const comps = componentCache.get(mesh) || [];
+    const matched = [];
+
+    comps.forEach((comp) => {
+      if (wheels.some((wheel) => wheel.tireComp === comp)) return;
+      if (comp.verts.length < 3) return;
+
+      let bestWheel = null;
+      let bestScore = Infinity;
+      wheels.forEach((wheel) => {
+        const tire = wheel.tireComp;
+        const discDistance = Math.hypot(comp.cx - tire.cx, comp.cz - tire.cz);
+        const inPlaneHalf = 0.5 * Math.max(comp.sizeX, comp.sizeZ);
+        const axleDistance = Math.abs(comp.cy - tire.cy);
+        const compMax = Math.max(comp.sizeX, comp.sizeY, comp.sizeZ);
+
+        if (discDistance > wheel.radius * 1.35) return;
+        if (discDistance + inPlaneHalf > wheel.radius * 1.7) return;
+        if (axleDistance > wheel.axleHalfWidth * 1.6 + 0.03) return;
+        if (compMax > wheel.radius * 2.8) return;
+
+        const score = discDistance + axleDistance * 0.35;
+        if (score < bestScore) {
+          bestWheel = wheel;
+          bestScore = score;
+        }
+      });
+
+      if (bestWheel) matched.push({ comp, wheel: bestWheel });
+    });
+
+    matched.forEach(({ comp, wheel }) => {
+      const tire = wheel.tireComp;
+      const part = extractComponentToPivotedMesh(mesh, comp, tire.cx, tire.cy, tire.cz);
+      part.name = `${wheel.mesh.name}_${mesh.material?.name || mesh.name || 'part'}`;
+      wheel.mesh.add(part);
+      wheel.partsCount += 1;
+      const meshComponents = componentsByMesh.get(mesh) || [];
+      meshComponents.push(comp.vertSet);
+      componentsByMesh.set(mesh, meshComponents);
+    });
+  });
+
+  componentsByMesh.forEach((components, mesh) => removeFacesByVerts(mesh, components));
+
+  console.log('[formula] wheels:', wheels.map((w) => ({
+    name: w.mesh.name,
+    isFront: w.isFront,
+    parts: w.partsCount,
+    pos: w.mesh.position.toArray().map((n) => +n.toFixed(3))
+  })));
+  return wheels;
+}
+
+function collectBmwWheels(bmwContent) {
+  const wheelGroups = [];
+  bmwContent.traverse((object) => {
+    if (object.isMesh) return;
+    if (/^WHEEL_(LF|RF|LR|RR)$/i.test(object.name || '')) wheelGroups.push(object);
+  });
+
+  if (wheelGroups.length !== 4) {
+    console.warn('[bmw] expected 4 wheel groups, found', wheelGroups.length, wheelGroups.map((g) => g.name));
+    return [];
+  }
+
+  const splitZ = wheelGroups.reduce((sum, group) => sum + group.position.z, 0) / wheelGroups.length;
+  const wheels = wheelGroups.map((group) => ({
+    mesh: group,
+    isFront: group.position.z > splitZ,
+    spin: 0,
+    kind: 'bmw',
+    axleVec: X_AXIS,
+    steerVec: Y_AXIS,
+    steerSign: -1,
+    baseQuat: group.quaternion.clone()
+  }));
+
+  console.log('[bmw] wheels:', wheels.map((w) => ({
+    name: w.mesh.name,
+    isFront: w.isFront,
+    pos: w.mesh.position.toArray().map((n) => +n.toFixed(2))
+  })));
+  return wheels;
+}
+
+function collectFerrariWheels(ferrariContent) {
+  const combinedWheel = ferrariContent.getObjectByName('Combined3DWheel_3DWheel_Front_L Instance1_Src4');
+  if (!combinedWheel) {
+    console.warn('[ferrari] combined wheel hierarchy missing');
+    return [];
+  }
+
+  ferrariContent.updateMatrixWorld(true);
+  const wheelMeshes = [];
+  const box = new THREE.Box3();
+  const center = new THREE.Vector3();
+
+  combinedWheel.traverse((object) => {
+    if (!object.isMesh || !object.geometry) return;
+    box.setFromObject(object);
+    if (box.isEmpty()) return;
+    box.getCenter(center);
+    wheelMeshes.push({ object, center: center.clone(), box: box.clone() });
+  });
+
+  if (wheelMeshes.length < 4) {
+    console.warn('[ferrari] not enough wheel meshes to create pivots:', wheelMeshes.length);
+    return [];
+  }
+
+  const splitX = wheelMeshes.reduce((sum, item) => sum + item.center.x, 0) / wheelMeshes.length;
+  const splitZ = wheelMeshes.reduce((sum, item) => sum + item.center.z, 0) / wheelMeshes.length;
+  const clusters = new Map([
+    ['FL', []],
+    ['FR', []],
+    ['RL', []],
+    ['RR', []]
+  ]);
+
+  wheelMeshes.forEach((item) => {
+    const front = item.center.z > splitZ;
+    const left = item.center.x > splitX;
+    clusters.get(`${front ? 'F' : 'R'}${left ? 'L' : 'R'}`).push(item);
+  });
+
+  const parent = combinedWheel.parent || ferrariContent;
+  const wheels = [];
+  const tempCenter = new THREE.Vector3();
+  const parentLocal = new THREE.Vector3();
+
+  clusters.forEach((items, key) => {
+    if (!items.length) return;
+
+    const clusterBox = new THREE.Box3();
+    items.forEach((item) => clusterBox.union(item.box));
+    clusterBox.getCenter(tempCenter);
+
+    const pivot = new THREE.Group();
+    pivot.name = `FerrariWheel_${key}`;
+    parent.add(pivot);
+    parentLocal.copy(tempCenter);
+    parent.worldToLocal(parentLocal);
+    pivot.position.copy(parentLocal);
+    pivot.updateMatrixWorld(true);
+
+    items.forEach(({ object }) => {
+      pivot.attach(object);
+    });
+
+    wheels.push({
+      mesh: pivot,
+      isFront: key.startsWith('F'),
+      spin: 0,
+      kind: 'ferrari',
+      axleVec: X_AXIS,
+      steerVec: Y_AXIS,
+      steerSign: -1,
+      baseQuat: pivot.quaternion.clone(),
+      partsCount: items.length
+    });
+  });
+
+  console.log('[ferrari] wheels:', wheels.map((w) => ({
+    name: w.mesh.name,
+    isFront: w.isFront,
+    parts: w.partsCount,
+    pos: w.mesh.position.toArray().map((n) => +n.toFixed(3))
+  })));
+  return wheels;
+}
+
 function collectJeepWheels(jeepContent) {
+  const wranglerWheels = collectWranglerWheelGroups(jeepContent);
+  if (wranglerWheels.length === 4) return wranglerWheels;
+
   const tireMeshes = [];
   jeepContent.traverse((object) => {
     if (!object.isMesh || !object.geometry) return;
@@ -499,16 +1229,105 @@ function collectJeepWheels(jeepContent) {
   return wheels;
 }
 
-function collectBikeWheels(bikeContent) {
+function collectWranglerWheelGroups(jeepContent) {
+  const wheelGroups = [];
+  jeepContent.traverse((object) => {
+    if (object.isMesh) return;
+    if (/^wrangwheel\d+$/i.test(object.name || '')) wheelGroups.push(object);
+  });
+
+  if (wheelGroups.length !== 4) return [];
+
+  const wheelData = wheelGroups.map((group) => {
+    const box = getGroupLocalBox(group);
+    const center = new THREE.Vector3();
+    box.getCenter(center);
+    return { group, center };
+  });
+  const rearZ = wheelData.reduce((sum, item) => sum + item.center.z, 0) / wheelData.length;
+
+  const wheels = wheelData.map(({ group, center }) => {
+    const pivot = new THREE.Group();
+    pivot.name = `JeepWheel_${group.name}`;
+    pivot.position.copy(center);
+
+    const children = [...group.children];
+    group.add(pivot);
+    for (const child of children) {
+      child.traverse((object) => {
+        if (!object.isMesh || !object.geometry) return;
+        object.geometry.translate(-center.x, -center.y, -center.z);
+        object.geometry.computeBoundingBox();
+        object.geometry.computeBoundingSphere();
+      });
+      pivot.add(child);
+    }
+
+    return {
+      mesh: pivot,
+      // In this Wrangler GLB, the front axle sits on the positive side of the
+      // wheel-group local Z split after the Sketchfab root transform is applied.
+      isFront: center.z > rearZ,
+      spin: 0,
+      kind: 'jeep',
+      axleVec: X_AXIS,
+      steerVec: Y_AXIS,
+      steerSign: -1
+    };
+  });
+
+  console.log('[wrangler] wheels:', wheels.map((w) => ({
+    name: w.mesh.name,
+    isFront: w.isFront,
+    pos: w.mesh.position.toArray().map((n) => +n.toFixed(2))
+  })));
+  return wheels;
+}
+
+function getGroupLocalBox(group) {
+  const box = new THREE.Box3();
+  const localMatrix = new THREE.Matrix4();
+
+  group.updateMatrixWorld(true);
+  const inverseGroupWorld = new THREE.Matrix4().copy(group.matrixWorld).invert();
+  group.traverse((object) => {
+    if (!object.isMesh || !object.geometry) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    localMatrix.multiplyMatrices(inverseGroupWorld, object.matrixWorld);
+    box.union(object.geometry.boundingBox.clone().applyMatrix4(localMatrix));
+  });
+
+  return box;
+}
+
+function setVisibleBoxFromObject(targetBox, root) {
+  targetBox.makeEmpty();
+  root.updateMatrixWorld(true);
+  root.traverse((object) => {
+    if (object.visible === false || !object.isMesh || !object.geometry) return;
+    if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+    targetBox.union(object.geometry.boundingBox.clone().applyMatrix4(object.matrixWorld));
+  });
+  if (targetBox.isEmpty()) targetBox.setFromObject(root);
+  return targetBox;
+}
+
+function collectBikeWheels(bikeContent, options = {}) {
+  const tireMaterialName = options.tireMaterialName || 'Rubber';
+  const logPrefix = options.logPrefix || 'bike';
+  const frontSortDirection = options.frontSortDirection || 'desc';
+  const skipWheelPartMaterialNames = options.skipWheelPartMaterialNames || [];
+  const shouldSkipWheelPart = options.shouldSkipWheelPart || null;
+  const bikeSteerSign = options.bikeSteerSign || -1;
   // Gather every indexed mesh in the bike — we may pull wheel parts out of any of them.
   const allMeshes = [];
   bikeContent.traverse((object) => {
-    if (object.isMesh && object.geometry?.index) allMeshes.push(object);
+    if (object.visible !== false && object.isMesh && object.geometry?.index) allMeshes.push(object);
   });
 
-  const rubberMesh = allMeshes.find((m) => m.material?.name === 'Rubber');
+  const rubberMesh = allMeshes.find((m) => m.material?.name === tireMaterialName);
   if (!rubberMesh) {
-    console.warn('[bike] Rubber mesh not found');
+    console.warn(`[${logPrefix}] tire mesh not found:`, tireMaterialName);
     return [];
   }
 
@@ -529,7 +1348,7 @@ function collectBikeWheels(bikeContent) {
   const axleSizeKey = `size${axleInfo.name.toUpperCase()}`;
   const forwardSizeKey = `size${forwardInfo.name.toUpperCase()}`;
   const steerSizeKey = `size${steerInfo.name.toUpperCase()}`;
-  console.log(`[bike] axes — axle:${axleInfo.name} steer:${steerInfo.name} forward:${forwardInfo.name}`);
+  console.log(`[${logPrefix}] axes - axle:${axleInfo.name} steer:${steerInfo.name} forward:${forwardInfo.name}`);
 
   // Step 1: find the 2 tire components in the rubber mesh (axis-agnostic disc test).
   const rubberComps = findConnectedComponents(rubberMesh.geometry);
@@ -546,11 +1365,16 @@ function collectBikeWheels(bikeContent) {
   });
   const tires = tireCandidates.slice(0, 2);
   if (tires.length < 2) {
-    console.warn('[bike] Could not isolate 2 tires (found', tires.length, 'candidates)');
+    console.warn(`[${logPrefix}] Could not isolate 2 tires (found`, tires.length, 'candidates)');
     return [];
   }
-  // Front first along the bike's forward axis.
-  tires.sort((a, b) => b[forwardKey] - a[forwardKey]);
+  // Front first along the bike's forward axis. Some GLBs are authored with
+  // their forward coordinate reversed, so callers can flip this per asset.
+  tires.sort((a, b) => (
+    frontSortDirection === 'asc'
+      ? a[forwardKey] - b[forwardKey]
+      : b[forwardKey] - a[forwardKey]
+  ));
 
   // Step 2: build a pivot Group per wheel at the tire's axle, drop the tire mesh inside.
   const wheels = tires.map((tireComp, i) => {
@@ -574,6 +1398,7 @@ function collectBikeWheels(bikeContent) {
       kind: 'bike',
       axleVec: axleInfo.vec,
       steerVec: steerInfo.vec,
+      bikeSteerSign,
       partsCount: 1
     };
   });
@@ -584,6 +1409,8 @@ function collectBikeWheels(bikeContent) {
   // (forward × steer axes — the plane perpendicular to the axle).
   const otherMeshes = allMeshes.filter((m) => m !== rubberMesh);
   for (const mesh of otherMeshes) {
+    const meshMaterialName = (mesh.material?.name || '').toLowerCase();
+    if (skipWheelPartMaterialNames.some((name) => meshMaterialName.includes(name))) continue;
     const comps = findConnectedComponents(mesh.geometry);
     const matched = [];
 
@@ -614,6 +1441,7 @@ function collectBikeWheels(bikeContent) {
       for (let w = 0; w < wheels.length; w += 1) {
         const wheel = wheels[w];
         const t = wheel.tireComp;
+        if (shouldSkipWheelPart?.({ materialName: meshMaterialName, comp, wheel, tire: t, forwardKey, steerKey, axleKey })) continue;
         const dFwd = comp[forwardKey] - t[forwardKey];
         const dStr = comp[steerKey] - t[steerKey];
         const dist = Math.hypot(dFwd, dStr);
@@ -693,24 +1521,24 @@ function collectBikeWheels(bikeContent) {
     wheel.partsCount += 1;
   }
   removeFacesByVerts(rubberMesh, treadMatched.map((m) => m.comp.vertSet));
-  console.log(`[bike] tread-block pass: ${treadMatched.length} components moved into wheel pivots`);
+  console.log(`[${logPrefix}] tread-block pass: ${treadMatched.length} components moved into wheel pivots`);
 
   for (const w of wheels) {
-    console.log(`[bike] ${w.mesh.name} children (${w.mesh.children.length}):`,
-      w.mesh.children.map((c) => {
-        const g = c.geometry;
-        if (!g) return c.name;
-        g.computeBoundingBox();
-        const s = new THREE.Vector3();
-        g.boundingBox.getSize(s);
-        return `${c.name} ext=${s.x.toFixed(0)}x${s.y.toFixed(0)}x${s.z.toFixed(0)}`;
-      }));
-  }
-  console.log('[bike] Wheel pivots:', wheels.map((w) => ({
-    name: w.mesh.name, isFront: w.isFront, parts: w.partsCount,
-    pivotPos: w.mesh.position.toArray().map((n) => +n.toFixed(1)),
-    radius: +w.tireRadius.toFixed(1)
-  })));
+      console.log(`[${logPrefix}] ${w.mesh.name} children (${w.mesh.children.length}):`,
+        w.mesh.children.map((c) => {
+          const g = c.geometry;
+          if (!g) return c.name;
+          g.computeBoundingBox();
+          const s = new THREE.Vector3();
+          g.boundingBox.getSize(s);
+          return `${c.name} ext=${s.x.toFixed(0)}x${s.y.toFixed(0)}x${s.z.toFixed(0)}`;
+        }));
+    }
+  console.log(`[${logPrefix}] Wheel pivots:`, wheels.map((w) => ({
+      name: w.mesh.name, isFront: w.isFront, parts: w.partsCount,
+      pivotPos: w.mesh.position.toArray().map((n) => +n.toFixed(1)),
+      radius: +w.tireRadius.toFixed(1)
+    })));
   return wheels;
 }
 
@@ -1000,6 +1828,10 @@ function showCar(index) {
     modelRoot.visible = true;
     if (bikePivot) bikePivot.visible = false;
     if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
 
     modelRoot.position.set(0, 0, 0);
     modelRoot.scale.setScalar(1);
@@ -1020,6 +1852,10 @@ function showCar(index) {
   } else if (car.type === 'jeep') {
     if (modelRoot) modelRoot.visible = false;
     if (bikePivot) bikePivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
     jeepPivot.visible = true;
 
     jeepPivot.position.set(0, 0, 0);
@@ -1045,6 +1881,10 @@ function showCar(index) {
   } else if (car.type === 'bike') {
     if (modelRoot) modelRoot.visible = false;
     if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
     bikePivot.visible = true;
 
     // Reset transforms before measuring so we get the bike's natural bbox.
@@ -1074,6 +1914,131 @@ function showCar(index) {
       steerStates[index].angle = 0;
       steerStates[index].lean = 0;
     }
+  } else if (car.type === 'formula') {
+    if (modelRoot) modelRoot.visible = false;
+    if (bikePivot) bikePivot.visible = false;
+    if (jeepPivot) jeepPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
+    formulaPivot.visible = true;
+
+    formulaPivot.position.set(0, 0, 0);
+    formulaPivot.scale.setScalar(1);
+    formulaPivot.quaternion.identity();
+    formulaRoot.position.set(0, 0, 0);
+    // The Formula GLB already ships with a Sketchfab root matrix that converts
+    // its OBJ-style axes into the viewer's Y-up space. Adding another X-axis
+    // correction rolls it onto its side.
+    formulaRoot.rotation.set(0, 0, 0);
+    formulaRoot.updateMatrixWorld(true);
+
+    reusableBox.setFromObject(formulaRoot);
+    reusableBox.getSize(reusableSize);
+    reusableBox.getCenter(reusableCenter);
+
+    const maxAxis = Math.max(reusableSize.x, reusableSize.y, reusableSize.z) || 1;
+    const scale = targetSize / maxAxis;
+    formulaPivot.scale.setScalar(scale);
+    formulaPivot.position.set(
+      -reusableCenter.x * scale,
+      -reusableBox.min.y * scale + 0.05,
+      -reusableCenter.z * scale
+    );
+    if (steerStates[index]) steerStates[index].angle = 0;
+  } else if (car.type === 'rickshaw') {
+    if (modelRoot) modelRoot.visible = false;
+    if (bikePivot) bikePivot.visible = false;
+    if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
+    rickshawPivot.visible = true;
+
+    // The GLB was pre-levelled in Blender (fix_rickshaw_ground_plane.py), so
+    // we no longer need any runtime tilt. Just centre horizontally and seat
+    // the world bbox on the grid.
+    rickshawRoot.position.set(0, 0, 0);
+    rickshawRoot.rotation.set(0, 0, 0);
+    rickshawPivot.position.set(0, 0, 0);
+    rickshawPivot.scale.setScalar(1);
+    rickshawPivot.quaternion.identity();
+    rickshawRoot.updateMatrixWorld(true);
+    rickshawPivot.updateMatrixWorld(true);
+
+    reusableBox.setFromObject(rickshawRoot);
+    reusableBox.getSize(reusableSize);
+    reusableBox.getCenter(reusableCenter);
+
+    const maxAxis = Math.max(reusableSize.x, reusableSize.y, reusableSize.z) || 1;
+    const scale = targetSize / maxAxis;
+    rickshawPivot.scale.setScalar(scale);
+    rickshawPivot.position.set(
+      -reusableCenter.x * scale,
+      -reusableBox.min.y * scale,
+      -reusableCenter.z * scale
+    );
+    if (steerStates[index]) steerStates[index].angle = 0;
+  } else if (car.type === 'bmw') {
+    if (modelRoot) modelRoot.visible = false;
+    if (bikePivot) bikePivot.visible = false;
+    if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
+    bmwPivot.visible = true;
+
+    bmwPivot.position.set(0, 0, 0);
+    bmwPivot.scale.setScalar(1);
+    bmwPivot.quaternion.identity();
+    bmwRoot.position.set(0, 0, 0);
+    bmwRoot.rotation.set(0, 0, 0);
+    bmwRoot.updateMatrixWorld(true);
+    bmwPivot.updateMatrixWorld(true);
+
+    reusableBox.setFromObject(bmwRoot);
+    reusableBox.getSize(reusableSize);
+    reusableBox.getCenter(reusableCenter);
+
+    const maxAxis = Math.max(reusableSize.x, reusableSize.y, reusableSize.z) || 1;
+    const scale = targetSize / maxAxis;
+    bmwPivot.scale.setScalar(scale);
+    bmwPivot.position.set(
+      -reusableCenter.x * scale,
+      -reusableBox.min.y * scale + 0.05,
+      -reusableCenter.z * scale
+    );
+    if (steerStates[index]) steerStates[index].angle = 0;
+  } else if (car.type === 'ferrari') {
+    if (modelRoot) modelRoot.visible = false;
+    if (bikePivot) bikePivot.visible = false;
+    if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    ferrariPivot.visible = true;
+
+    ferrariPivot.position.set(0, 0, 0);
+    ferrariPivot.scale.setScalar(1);
+    ferrariPivot.quaternion.identity();
+    ferrariRoot.position.set(0, 0, 0);
+    ferrariRoot.rotation.set(0, 0, 0);
+    ferrariRoot.updateMatrixWorld(true);
+    ferrariPivot.updateMatrixWorld(true);
+
+    reusableBox.setFromObject(ferrariRoot);
+    reusableBox.getSize(reusableSize);
+    reusableBox.getCenter(reusableCenter);
+
+    const maxAxis = Math.max(reusableSize.x, reusableSize.y, reusableSize.z) || 1;
+    const scale = targetSize / maxAxis;
+    ferrariPivot.scale.setScalar(scale);
+    ferrariPivot.position.set(
+      -reusableCenter.x * scale,
+      -reusableBox.min.y * scale + 0.05,
+      -reusableCenter.z * scale
+    );
+    if (steerStates[index]) steerStates[index].angle = 0;
   }
 
   carTitle.textContent = car.title;
@@ -1089,7 +2054,7 @@ function showCar(index) {
 
 async function loadGlbAsThreeScene(url, onProgress) {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 10000);
+  const timeout = window.setTimeout(() => controller.abort(), 20000);
 
   try {
     const response = await fetch(url, { signal: controller.signal, cache: 'no-store' });
@@ -1157,12 +2122,10 @@ async function loadGlbImage(image, json, binary) {
   const blob = new Blob([bytes], { type: image.mimeType || 'image/png' });
   // Decode WITHOUT a vertical flip — glTF stores UVs with origin at the
   // top-left, and `texture.flipY = false` is what tells Three.js to sample
-  // them that way. Doing both (decode-flip + flipY=false) double-flips and
-  // ends up sampling the texture upside-down (dark interior atlas regions
-  // bleeding onto the Jeep's red body panels).
+  // them that way.
   const bitmap = await createImageBitmap(blob);
   const texture = new THREE.CanvasTexture(bitmap);
-  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.colorSpace = THREE.NoColorSpace;
   texture.flipY = false;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
@@ -1172,6 +2135,14 @@ async function loadGlbImage(image, json, binary) {
   texture.generateMipmaps = true;
   texture.needsUpdate = true;
   return texture;
+}
+
+function cloneTextureForMap(texture, colorSpace = THREE.NoColorSpace) {
+  if (!texture) return null;
+  const clone = texture.clone();
+  clone.colorSpace = colorSpace;
+  clone.needsUpdate = true;
+  return clone;
 }
 
 function buildNode(json, binary, node, textures) {
@@ -1229,21 +2200,40 @@ function buildPrimitive(json, binary, primitive, textures) {
 
   const materialDefinition = json.materials?.[primitive.material];
   const pbr = materialDefinition?.pbrMetallicRoughness || {};
-  const baseColorTexture = pbr.baseColorTexture ? textures[pbr.baseColorTexture.index] : null;
-  const metallicRoughnessTexture = pbr.metallicRoughnessTexture ? textures[pbr.metallicRoughnessTexture.index] : null;
-  const baseColorFactor = pbr.baseColorFactor ? new THREE.Color().fromArray(pbr.baseColorFactor) : new THREE.Color(0xffffff);
+  const baseColorTexture = pbr.baseColorTexture ? cloneTextureForMap(textures[pbr.baseColorTexture.index], THREE.SRGBColorSpace) : null;
+  const metallicRoughnessTexture = pbr.metallicRoughnessTexture ? cloneTextureForMap(textures[pbr.metallicRoughnessTexture.index]) : null;
+  const normalTexture = materialDefinition?.normalTexture ? cloneTextureForMap(textures[materialDefinition.normalTexture.index]) : null;
+  const emissiveTexture = materialDefinition?.emissiveTexture ? cloneTextureForMap(textures[materialDefinition.emissiveTexture.index], THREE.SRGBColorSpace) : null;
+  const baseColorFactor = pbr.baseColorFactor || [1, 1, 1, 1];
+  const baseColor = new THREE.Color(baseColorFactor[0], baseColorFactor[1], baseColorFactor[2]);
+  const alphaMode = materialDefinition?.alphaMode || 'OPAQUE';
+  const transparent = alphaMode === 'BLEND' || baseColorFactor[3] < 1;
+  const emissiveFactor = materialDefinition?.emissiveFactor || [0, 0, 0];
 
   const material = new THREE.MeshStandardMaterial({
-    color: baseColorFactor,
+    color: baseColor,
     map: baseColorTexture,
     metalnessMap: metallicRoughnessTexture,
     roughnessMap: metallicRoughnessTexture,
+    normalMap: normalTexture,
+    emissiveMap: emissiveTexture,
+    emissive: new THREE.Color(emissiveFactor[0], emissiveFactor[1], emissiveFactor[2]),
     metalness: pbr.metallicFactor !== undefined ? pbr.metallicFactor : 1,
-    roughness: pbr.roughnessFactor !== undefined ? pbr.roughnessFactor : 1
+    roughness: pbr.roughnessFactor !== undefined ? pbr.roughnessFactor : 1,
+    opacity: baseColorFactor[3] ?? 1,
+    transparent,
+    depthWrite: !transparent,
+    alphaTest: alphaMode === 'MASK' ? materialDefinition.alphaCutoff ?? 0.5 : 0,
+    side: materialDefinition?.doubleSided ? THREE.DoubleSide : THREE.FrontSide
   });
+  if (materialDefinition?.normalTexture?.scale !== undefined) {
+    material.normalScale.setScalar(materialDefinition.normalTexture.scale);
+  }
   material.name = materialDefinition?.name || '';
   material.userData.baseColorTexture = baseColorTexture;
   material.userData.metallicRoughnessTexture = metallicRoughnessTexture;
+  material.userData.normalTexture = normalTexture;
+  material.userData.materialDefinition = materialDefinition || null;
 
   return new THREE.Mesh(geometry, material);
 }
@@ -1346,7 +2336,7 @@ function updateWheels(delta) {
   const steer = steerStates[activeIndex];
 
   if (car.type === 'bike') {
-    updateBikePhysics(steer, steerInput, delta);
+    updateBikePhysics(steer, steerInput, delta, car.type);
     return;
   }
 
@@ -1366,15 +2356,41 @@ function updateWheels(delta) {
   const spinStep = wheelSpeed * delta;
   carWheels[activeIndex].forEach((wheel) => {
     wheel.spin = (wheel.spin + spinStep) % TWO_PI;
+    const steerSign = wheel.steerSign || 1;
+
+    if (wheel.kind === 'rickshaw') {
+      // Pivot was re-parented to rickshawRoot (identity world rotation), so
+      // local +X = world +X and local +Y = world +Y. Pure local quaternion
+      // composition gives a clean roll + steer with zero parent compensation.
+      _spinQuat.setFromAxisAngle(X_AXIS, wheel.spin);
+      if (wheel.isFront) {
+        _steerQuat.setFromAxisAngle(Y_AXIS, steerSign * steer.angle);
+        if (wheel.steeringGroup) wheel.steeringGroup.quaternion.copy(_steerQuat);
+        wheel.mesh.quaternion.copy(_spinQuat);
+      } else {
+        wheel.mesh.quaternion.copy(_spinQuat);
+      }
+      return;
+    }
+
     const axleVec = wheel.axleVec || X_AXIS;
     const steerVec = wheel.steerVec || STEER_AXIS;
-    const steerSign = wheel.steerSign || 1;
+    const baseQuat = wheel.baseQuat || null;
     if (wheel.isFront) {
       _steerQuat.setFromAxisAngle(steerVec, steerSign * steer.angle);
       _spinQuat.setFromAxisAngle(axleVec, wheel.spin);
-      wheel.mesh.quaternion.copy(_steerQuat).multiply(_spinQuat);
+      if (baseQuat) {
+        wheel.mesh.quaternion.copy(baseQuat).multiply(_steerQuat).multiply(_spinQuat);
+      } else {
+        wheel.mesh.quaternion.copy(_steerQuat).multiply(_spinQuat);
+      }
     } else {
-      wheel.mesh.quaternion.setFromAxisAngle(axleVec, wheel.spin);
+      _spinQuat.setFromAxisAngle(axleVec, wheel.spin);
+      if (baseQuat) {
+        wheel.mesh.quaternion.copy(baseQuat).multiply(_spinQuat);
+      } else {
+        wheel.mesh.quaternion.copy(_spinQuat);
+      }
     }
   });
 }
@@ -1388,7 +2404,7 @@ function updateWheels(delta) {
 //   that's different from a car (a car yaws around its own vertical axis,
 //   a bike rolls around its forward axis). Lean angle tracks steer direction
 //   with smooth easing so it doesn't snap when keys are tapped.
-function updateBikePhysics(steer, steerInput, delta) {
+function updateBikePhysics(steer, steerInput, delta, bikeType = 'bike') {
   if (steerInput !== 0) {
     steer.angle = THREE.MathUtils.clamp(
       steer.angle + steerInput * STEER_RATE * delta,
@@ -1405,7 +2421,11 @@ function updateBikePhysics(steer, steerInput, delta) {
   const leanLerp = 1 - Math.exp(-5 * delta);
   steer.lean = THREE.MathUtils.lerp(steer.lean, targetLean, leanLerp);
 
-  if (bikePivot && bikeLeanAxis) bikePivot.quaternion.setFromAxisAngle(bikeLeanAxis, steer.lean);
+  const activePivot = bikePivot;
+  const activeLeanAxis = bikeLeanAxis;
+  if (activePivot && activeLeanAxis) {
+    activePivot.quaternion.setFromAxisAngle(activeLeanAxis, steer.lean);
+  }
 
   const TWO_PI = Math.PI * 2;
   const spinStep = BIKE_WHEEL_SPEED * delta;
@@ -1414,24 +2434,20 @@ function updateBikePhysics(steer, steerInput, delta) {
     const axleVec = wheel.axleVec || Y_AXIS;
     const steerVec = wheel.steerVec || Z_AXIS;
     if (wheel.isFront) {
-      // Negate the steer angle so the wheel turns the same way the bike leans.
-      // The model's middle-extent axis (steerVec) points down in its local
-      // frame, so a positive steer.angle would yaw the wheel against the lean.
-      _steerQuat.setFromAxisAngle(steerVec, -steer.angle);
+      _steerQuat.setFromAxisAngle(steerVec, (wheel.bikeSteerSign || -1) * steer.angle);
       _spinQuat.setFromAxisAngle(axleVec, wheel.spin);
       wheel.mesh.quaternion.copy(_steerQuat).multiply(_spinQuat);
     } else {
       wheel.mesh.quaternion.setFromAxisAngle(axleVec, wheel.spin);
     }
   });
-}
 
+}
 function resize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
-
 function roundRect(ctx, x, y, width, height, radius) {
   ctx.beginPath();
   ctx.moveTo(x + radius, y);
@@ -1441,27 +2457,19 @@ function roundRect(ctx, x, y, width, height, radius) {
   ctx.arcTo(x, y, x + width, y, radius);
   ctx.closePath();
 }
-
 function lighten(color, amount) {
   return shiftColor(color, amount);
 }
-
 function darken(color, amount) {
   return shiftColor(color, -amount);
 }
-
 function shiftColor(color, amount) {
   const source = new THREE.Color(color);
   source.r = THREE.MathUtils.clamp(source.r + amount, 0, 1);
   source.g = THREE.MathUtils.clamp(source.g + amount, 0, 1);
   source.b = THREE.MathUtils.clamp(source.b + amount, 0, 1);
-  return `#${source.getHexString()}`;
+  return '#' + source.getHexString();
 }
 
 window.addEventListener('resize', resize);
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowRight') showCar((activeIndex + 1) % cars.length);
-  if (event.key === 'ArrowLeft') showCar((activeIndex + cars.length - 1) % cars.length);
-});
-
 animate();
