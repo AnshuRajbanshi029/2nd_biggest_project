@@ -87,6 +87,12 @@ const cars = [
     title: '2020 Ferrari Roma',
     description: 'Elegant Ferrari Roma coupe with polished grey paint, transparent glass, detailed interior, badges, wheels, and brake calipers.',
     targetSize: 3.8
+  },
+  {
+    type: 'bicycle',
+    title: 'Bicycle',
+    description: 'Imported bicycle model with rolling wheels, animated drivetrain, front-wheel steering, and a light A/D lean.',
+    targetSize: 2.8
   }
 ];
 
@@ -220,6 +226,11 @@ let bmwRoot = null;
 let bmwPivot = null;
 let ferrariRoot = null;
 let ferrariPivot = null;
+let bicycleRoot = null;
+let bicyclePivot = null;
+let bicycleWheels = [];
+let bicycleDrivetrain = null;
+let bicycleLeanAxis = null;
 let carRoots = [];
 let carWheels = [];
 let steerStates = [];
@@ -232,6 +243,9 @@ const STEER_RATE = 2.5;
 const STEER_RETURN_RATE = 4.0;
 const BIKE_STEER_MAX = 0.35;
 const BIKE_LEAN_MAX = 0.45;
+const BICYCLE_WHEEL_SPEED = 4;
+const BICYCLE_STEER_MAX = 0.36;
+const BICYCLE_LEAN_MAX = 0.24;
 const drivingKeys = new Set();
 const X_AXIS = new THREE.Vector3(1, 0, 0);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
@@ -273,14 +287,16 @@ const formulaProgress = { loaded: 0, total: 0 };
 const rickshawProgress = { loaded: 0, total: 0 };
 const bmwProgress = { loaded: 0, total: 0 };
 const ferrariProgress = { loaded: 0, total: 0 };
+const bicycleProgress = { loaded: 0, total: 0 };
 function updateProgress() {
-  const total = (carsProgress.total || 0) + (bikeProgress.total || 0) + (jeepProgress.total || 0) + (formulaProgress.total || 0) + (rickshawProgress.total || 0) + (bmwProgress.total || 0) + (ferrariProgress.total || 0);
+  const buckets = [carsProgress, bikeProgress, jeepProgress, formulaProgress, rickshawProgress, bmwProgress, ferrariProgress, bicycleProgress];
+  const total = buckets.reduce((sum, bucket) => sum + (bucket.total || 0), 0);
   if (!total) return;
-  const loaded = (carsProgress.loaded || 0) + (bikeProgress.loaded || 0) + (jeepProgress.loaded || 0) + (formulaProgress.loaded || 0) + (rickshawProgress.loaded || 0) + (bmwProgress.loaded || 0) + (ferrariProgress.loaded || 0);
+  const loaded = buckets.reduce((sum, bucket) => sum + (bucket.loaded || 0), 0);
   progressBar.style.setProperty('--progress', `${Math.round((loaded / total) * 100)}%`);
 }
 
-const loadedStatusText = 'Loaded 3 cars + Yamaha FZ16 + Wrangler Rubicon + Formula 1 + Bajaj Rickshaw + BMW 1M + Ferrari Roma. Hold A/D to steer.';
+const loadedStatusText = 'Loaded 10 vehicles: 3 cars, Yamaha FZ16, Wrangler Rubicon, Formula 1, Bajaj Rickshaw, BMW 1M, Ferrari Roma, and Bicycle. Use Rotate tires, then hold A/D to steer two-wheelers.';
 
 Promise.all([
   loadGlbAsThreeScene('./free_racing_car_in_3_styles.glb', (event) => {
@@ -324,8 +340,14 @@ Promise.all([
     ferrariProgress.loaded = event.loaded;
     ferrariProgress.total = event.total;
     updateProgress();
+  }),
+  loadGlbAsThreeScene('./bicycle.glb?v=1', (event) => {
+    if (!event.total) return;
+    bicycleProgress.loaded = event.loaded;
+    bicycleProgress.total = event.total;
+    updateProgress();
   })
-]).then(([carsGltf, bikeGltf, jeepGltf, formulaGltf, rickshawGltf, bmwGltf, ferrariGltf]) => {
+]).then(([carsGltf, bikeGltf, jeepGltf, formulaGltf, rickshawGltf, bmwGltf, ferrariGltf, bicycleGltf]) => {
   try {
     modelRoot = carsGltf.scene;
     scene.add(modelRoot);
@@ -386,6 +408,15 @@ Promise.all([
     scene.add(ferrariPivot);
     applyFerrariMaterials(ferrariRoot);
 
+    bicycleRoot = bicycleGltf.scene;
+    bicyclePivot = new THREE.Group();
+    bicyclePivot.add(bicycleRoot);
+    scene.add(bicyclePivot);
+    applyBicycleMaterials(bicycleRoot);
+    const bicycleAnimation = prepareBicycleAnimation(bicycleRoot, bicyclePivot);
+    bicycleWheels = bicycleAnimation.wheels;
+    bicycleDrivetrain = bicycleAnimation.drivetrain;
+
     // The rickshaw GLB has a chassis pan/skirt that hangs below the tyres
     // and asymmetric front-vs-rear axle heights, so a naive bbox.min.y rest
     // tilts the model. We measure the front and rear contact lines once and
@@ -434,6 +465,10 @@ Promise.all([
         ferrariPivot.visible = false;
         return ferrariPivot;
       }
+      if (car.type === 'bicycle') {
+        bicyclePivot.visible = false;
+        return bicyclePivot;
+      }
       return null;
     });
 
@@ -447,6 +482,7 @@ Promise.all([
       if (car.type === 'rickshaw') return collectRickshawWheels(rickshawRoot);
       if (car.type === 'bmw') return collectBmwWheels(bmwRoot);
       if (car.type === 'ferrari') return collectFerrariWheels(ferrariRoot);
+      if (car.type === 'bicycle') return bicycleWheels;
       return [];
     });
 
@@ -466,6 +502,8 @@ Promise.all([
       status.textContent = wheelsSpinning
         ? (car.type === 'bike'
             ? 'Tires rolling. Hold A/D to steer the front wheel and lean the bike.'
+            : car.type === 'bicycle'
+              ? 'Bicycle drivetrain rolling. Hold A/D to steer the front wheel and lean the frame.'
             : 'Wheels spinning. Hold A/D to steer the front wheels.')
         : loadedStatusText;
       if (!wheelsSpinning) drivingKeys.clear();
@@ -614,6 +652,396 @@ function applyBikeMaterials(root) {
     object.receiveShadow = true;
     if (object.material) object.material.envMapIntensity = 0.85;
   });
+}
+
+function applyBicycleMaterials(root) {
+  root.traverse((object) => {
+    if (!object.isMesh) return;
+    object.castShadow = true;
+    object.receiveShadow = true;
+    if (object.geometry && !object.geometry.boundingSphere) object.geometry.computeBoundingSphere();
+    if (object.geometry && !object.geometry.boundingBox) object.geometry.computeBoundingBox();
+
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    materials.forEach((material) => {
+      if (!material) return;
+      if (material.map) material.map.colorSpace = THREE.SRGBColorSpace;
+      if (material.emissiveMap) material.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+      material.envMapIntensity = 0.85;
+      material.needsUpdate = true;
+    });
+  });
+}
+
+function prepareBicycleAnimation(model, animationRoot) {
+  const allMeshes = [];
+  model.traverse((object) => {
+    if (object.isMesh) allMeshes.push(object);
+  });
+
+  removeBicyclePreviewArtifacts(allMeshes);
+  const activeMeshes = allMeshes.filter((mesh) => mesh.parent);
+
+  const initBox = new THREE.Box3().setFromObject(model);
+  const initSize = initBox.getSize(new THREE.Vector3());
+  const initCenter = initBox.getCenter(new THREE.Vector3());
+  model.position.x -= initCenter.x;
+  model.position.z -= initCenter.z;
+  model.position.y -= initBox.min.y;
+  model.updateMatrixWorld(true);
+  animationRoot.updateMatrixWorld(true);
+
+  activeMeshes.forEach((mesh) => {
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+    const sphere = mesh.geometry.boundingSphere.clone();
+    sphere.applyMatrix4(mesh.matrixWorld);
+    mesh.userData.worldCenter = sphere.center.clone();
+    mesh.userData.worldRadius = sphere.radius;
+  });
+
+  const isMainWheelMesh = (mesh, materialPattern = '(tire|rim|wheel)') => {
+    const match = mesh.name.match(new RegExp(`^polySurface(\\d+)_${materialPattern}_0$`));
+    if (!match) return false;
+    const id = Number(match[1]);
+    return (id >= 92 && id <= 138) || (id >= 152 && id <= 198);
+  };
+  const wheelAccessoryNames = new Set([
+    'polySurface804_tire_0',
+    'polySurface805_rim_0',
+    'pCylinder109_rim_0',
+    'pCylinder110_tire_0'
+  ]);
+  const isWheelAccessoryMesh = (mesh) => wheelAccessoryNames.has(mesh.name);
+  const wheelAnchors = activeMeshes.filter(
+    (mesh) => isMainWheelMesh(mesh, '(tire|rim)') && mesh.userData.worldRadius > 0.02
+  );
+
+  if (wheelAnchors.length < 2) {
+    console.warn('[bicycle] not enough wheel anchors found:', wheelAnchors.length);
+    return { wheels: [], drivetrain: createBicycleDrivetrain(animationRoot, activeMeshes) };
+  }
+
+  const lengthAxis = initSize.x >= initSize.z ? 'x' : 'z';
+  let cA = wheelAnchors[0].userData.worldCenter.clone();
+  let cB = wheelAnchors[wheelAnchors.length - 1].userData.worldCenter.clone();
+  wheelAnchors.forEach((mesh) => {
+    const value = mesh.userData.worldCenter[lengthAxis];
+    if (value < cA[lengthAxis]) cA = mesh.userData.worldCenter.clone();
+    if (value > cB[lengthAxis]) cB = mesh.userData.worldCenter.clone();
+  });
+
+  for (let iter = 0; iter < 12; iter += 1) {
+    const sumA = new THREE.Vector3();
+    const sumB = new THREE.Vector3();
+    let nA = 0;
+    let nB = 0;
+    wheelAnchors.forEach((mesh) => {
+      const center = mesh.userData.worldCenter;
+      if (center.distanceToSquared(cA) < center.distanceToSquared(cB)) {
+        sumA.add(center);
+        nA += 1;
+      } else {
+        sumB.add(center);
+        nB += 1;
+      }
+    });
+    if (nA > 0) cA.copy(sumA.divideScalar(nA));
+    if (nB > 0) cB.copy(sumB.divideScalar(nB));
+  }
+
+  const wheelCenters = [cA, cB];
+  const wheelRadii = [0, 0];
+  wheelAnchors.forEach((mesh) => {
+    const center = mesh.userData.worldCenter;
+    const dA = center.distanceTo(cA);
+    const dB = center.distanceTo(cB);
+    const reach = mesh.userData.worldRadius;
+    if (dA < dB) {
+      wheelRadii[0] = Math.max(wheelRadii[0], dA + reach);
+    } else {
+      wheelRadii[1] = Math.max(wheelRadii[1], dB + reach);
+    }
+  });
+
+  const wheelMembers = [[], []];
+  const wheelCandidates = activeMeshes.filter((mesh) => isMainWheelMesh(mesh) || isWheelAccessoryMesh(mesh));
+  wheelCandidates.forEach((mesh) => {
+    const center = mesh.userData.worldCenter;
+    const dA = center.distanceTo(cA);
+    const dB = center.distanceTo(cB);
+    if (dA < dB) {
+      if (dA <= wheelRadii[0] * 0.98) wheelMembers[0].push(mesh);
+    } else if (dB <= wheelRadii[1] * 0.98) {
+      wheelMembers[1].push(mesh);
+    }
+  });
+
+  const rearReference = activeMeshes.find((mesh) => mesh.name === 'pCylinder103_steel_0');
+  let frontWheelIndex = 1;
+  if (rearReference?.userData.worldCenter) {
+    const rearCenter = rearReference.userData.worldCenter;
+    frontWheelIndex = rearCenter.distanceTo(cA) < rearCenter.distanceTo(cB) ? 1 : 0;
+  }
+  const rearWheelIndex = frontWheelIndex === 0 ? 1 : 0;
+  const forward = new THREE.Vector3().subVectors(wheelCenters[frontWheelIndex], wheelCenters[rearWheelIndex]).normalize();
+  const axleAxis = new THREE.Vector3().crossVectors(forward, Y_AXIS).normalize();
+  bicycleLeanAxis = forward.clone();
+  const wheelPivots = [];
+  for (let i = 0; i < 2; i += 1) {
+    const isFront = i === frontWheelIndex;
+    const pivot = new THREE.Group();
+    pivot.name = isFront ? 'BicycleWheel_Front' : 'BicycleWheel_Rear';
+    pivot.position.copy(wheelCenters[i]);
+    animationRoot.add(pivot);
+    pivot.updateMatrixWorld(true);
+    wheelMembers[i].forEach((mesh) => pivot.attach(mesh));
+    pivot.userData.axleAxis = axleAxis.clone();
+    wheelPivots.push({
+      mesh: pivot,
+      isFront,
+      spin: 0,
+      kind: 'bicycle',
+      axleVec: axleAxis.clone(),
+      steerVec: Y_AXIS,
+      steerSign: -1,
+      partsCount: wheelMembers[i].length
+    });
+  }
+
+  const drivetrain = createBicycleDrivetrain(animationRoot, activeMeshes);
+  console.log('[bicycle] wheels:', wheelPivots.map((wheel) => ({
+    name: wheel.mesh.name,
+    isFront: wheel.isFront,
+    parts: wheel.partsCount,
+    pos: wheel.mesh.position.toArray().map((n) => +n.toFixed(3))
+  })));
+  return { wheels: wheelPivots, drivetrain };
+}
+
+function bicycleMedian(values) {
+  if (!values.length) return 0;
+  const sorted = values.slice().sort((a, b) => a - b);
+  return sorted[Math.floor(sorted.length / 2)];
+}
+
+function isBicycleChainMesh(mesh) {
+  const match = mesh.name.match(/^polySurface(\d+)_steel_0$/);
+  if (!match) return false;
+  const id = Number(match[1]);
+  return id >= 530 && id <= 781;
+}
+
+function removeBicyclePreviewArtifacts(allMeshes) {
+  const artifactNames = new Set(['pasted__polySurface392_pasted__steel1_0']);
+  allMeshes.forEach((mesh) => {
+    if (artifactNames.has(mesh.name)) mesh.parent?.remove(mesh);
+  });
+}
+
+function createBicycleDrivetrain(animationRoot, allMeshes) {
+  const chainMeshes = allMeshes.filter((mesh) => mesh.parent && isBicycleChainMesh(mesh));
+  if (!chainMeshes.length) return null;
+
+  const findMesh = (name) => allMeshes.find((mesh) => mesh.parent && mesh.name === name);
+  const frontReference = findMesh('pCylinder83_rim_0') || findMesh('polySurface796_rim_0');
+  const rearReference = findMesh('pCylinder103_steel_0') || findMesh('polySurface133_steel_0');
+  if (!frontReference || !rearReference) return null;
+
+  const chainZ = chainMeshes.reduce((sum, mesh) => sum + mesh.userData.worldCenter.z, 0) / chainMeshes.length;
+  const frontPivotCenter = frontReference.userData.worldCenter.clone();
+  const rearPivotCenter = rearReference.userData.worldCenter.clone();
+  const frontCenter = frontPivotCenter.clone();
+  const rearCenter = rearPivotCenter.clone();
+  frontCenter.z = chainZ;
+  rearCenter.z = chainZ;
+
+  const frontDistances = chainMeshes
+    .filter((mesh) => mesh.userData.worldCenter.x > frontCenter.x - 0.0045)
+    .map((mesh) => Math.hypot(mesh.userData.worldCenter.x - frontCenter.x, mesh.userData.worldCenter.y - frontCenter.y));
+  const rearDistances = chainMeshes
+    .filter((mesh) => mesh.userData.worldCenter.x < rearCenter.x + 0.0045)
+    .map((mesh) => Math.hypot(mesh.userData.worldCenter.x - rearCenter.x, mesh.userData.worldCenter.y - rearCenter.y));
+  const rearBox = new THREE.Box3().setFromObject(rearReference);
+  const rearBoxSize = rearBox.getSize(new THREE.Vector3());
+  const rearToothTipRadius = Math.max(rearBoxSize.x, rearBoxSize.y) * 0.5;
+
+  const frontRadius = THREE.MathUtils.clamp(bicycleMedian(frontDistances), 0.0045, 0.009);
+  const rearRadius = THREE.MathUtils.clamp(rearToothTipRadius * 0.88, 0.0024, bicycleMedian(rearDistances));
+
+  const dir = new THREE.Vector3().subVectors(rearCenter, frontCenter);
+  dir.z = 0;
+  const distance = dir.length();
+  if (!distance) return null;
+  dir.normalize();
+  const perp = new THREE.Vector3(dir.y, -dir.x, 0).normalize();
+  const phi = Math.asin((frontRadius - rearRadius) / distance);
+  const topLength = distance * Math.cos(phi);
+  const rearArcLength = rearRadius * (Math.PI - 2 * phi);
+  const bottomLength = distance * Math.cos(phi);
+  const frontArcLength = frontRadius * (Math.PI + 2 * phi);
+  const totalLength = topLength + rearArcLength + bottomLength + frontArcLength;
+  const linkCount = Math.max(1, Math.round(chainMeshes.length / 3));
+  const pitch = totalLength / linkCount;
+
+  const frontTop = new THREE.Vector2(frontRadius * Math.sin(phi), frontRadius * Math.cos(phi));
+  const rearTop = new THREE.Vector2(distance + rearRadius * Math.sin(phi), rearRadius * Math.cos(phi));
+  const frontBottom = new THREE.Vector2(frontRadius * Math.sin(phi), -frontRadius * Math.cos(phi));
+  const rearBottom = new THREE.Vector2(distance + rearRadius * Math.sin(phi), -rearRadius * Math.cos(phi));
+
+  const toWorld = (point) => frontCenter.clone().addScaledVector(dir, point.x).addScaledVector(perp, point.y);
+  const toWorldTangent = (tangent) => new THREE.Vector3().addScaledVector(dir, tangent.x).addScaledVector(perp, tangent.y).normalize();
+  const getChainState = (value) => {
+    let d = value % totalLength;
+    if (d < 0) d += totalLength;
+    const point = new THREE.Vector2();
+    const tangent = new THREE.Vector2();
+    if (d < topLength) {
+      const u = d / topLength;
+      point.set(frontTop.x + u * (rearTop.x - frontTop.x), frontTop.y + u * (rearTop.y - frontTop.y));
+      tangent.subVectors(rearTop, frontTop).normalize();
+    } else if (d < topLength + rearArcLength) {
+      const u = (d - topLength) / rearArcLength;
+      const angle = (Math.PI / 2 - phi) - u * (Math.PI - 2 * phi);
+      point.set(distance + rearRadius * Math.cos(angle), rearRadius * Math.sin(angle));
+      tangent.set(Math.sin(angle), -Math.cos(angle));
+    } else if (d < topLength + rearArcLength + bottomLength) {
+      const u = (d - topLength - rearArcLength) / bottomLength;
+      point.set(rearBottom.x + u * (frontBottom.x - rearBottom.x), rearBottom.y + u * (frontBottom.y - rearBottom.y));
+      tangent.subVectors(frontBottom, rearBottom).normalize();
+    } else {
+      const u = (d - topLength - rearArcLength - bottomLength) / frontArcLength;
+      const angle = (-Math.PI / 2 + phi) - u * (Math.PI + 2 * phi);
+      point.set(frontRadius * Math.cos(angle), frontRadius * Math.sin(angle));
+      tangent.set(Math.sin(angle), -Math.cos(angle));
+    }
+    const position = toWorld(point);
+    position.z = chainZ;
+    const tangent3 = toWorldTangent(tangent);
+    return { position, angle: Math.atan2(tangent3.y, tangent3.x) };
+  };
+
+  const sampleCount = 720;
+  const samples = [];
+  for (let i = 0; i < sampleCount; i += 1) {
+    const s = (i / sampleCount) * totalLength;
+    samples.push({ s, ...getChainState(s) });
+  }
+
+  const chainItems = chainMeshes.map((mesh) => {
+    const center = mesh.userData.worldCenter;
+    let closest = samples[0];
+    let closestDistance = Infinity;
+    samples.forEach((sample) => {
+      const dx = center.x - sample.position.x;
+      const dy = center.y - sample.position.y;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < closestDistance) {
+        closestDistance = distanceSq;
+        closest = sample;
+      }
+    });
+    return {
+      mesh,
+      center,
+      pathOffset: closest.s
+    };
+  }).sort((a, b) => a.pathOffset - b.pathOffset);
+
+  let startIndex = 0;
+  let biggestGap = -Infinity;
+  for (let i = 0; i < chainItems.length; i += 1) {
+    const current = chainItems[i].pathOffset;
+    const next = chainItems[(i + 1) % chainItems.length].pathOffset + (i === chainItems.length - 1 ? totalLength : 0);
+    const gap = next - current;
+    if (gap > biggestGap) {
+      biggestGap = gap;
+      startIndex = (i + 1) % chainItems.length;
+    }
+  }
+
+  const orderedChainItems = chainItems.slice(startIndex).concat(chainItems.slice(0, startIndex));
+  const startOffset = orderedChainItems[0].pathOffset;
+  orderedChainItems.forEach((item) => {
+    item.unwrappedPathOffset = item.pathOffset < startOffset ? item.pathOffset + totalLength : item.pathOffset;
+  });
+
+  const meshesPerLink = Math.max(1, Math.round(orderedChainItems.length / linkCount));
+  const rawLinkGroups = [];
+  for (let i = 0; i < linkCount; i += 1) {
+    const members = orderedChainItems.slice(i * meshesPerLink, (i + 1) * meshesPerLink);
+    if (!members.length) continue;
+    const center = members.reduce((sum, item) => sum.add(item.center), new THREE.Vector3()).divideScalar(members.length);
+    const averagePathOffset = members.reduce((sum, item) => sum + item.unwrappedPathOffset, 0) / members.length;
+    rawLinkGroups.push({ members, center, averagePathOffset });
+  }
+
+  const baseOffset = rawLinkGroups.reduce((sum, group, index) => sum + group.averagePathOffset - index * pitch, 0) / rawLinkGroups.length;
+  const chainParts = rawLinkGroups.map((group, index) => {
+    const pathOffset = (baseOffset + index * pitch) % totalLength;
+    const state = getChainState(pathOffset);
+    const pivot = new THREE.Group();
+    pivot.name = `BicycleChainLink_${index}`;
+    pivot.position.copy(group.center);
+    animationRoot.add(pivot);
+    pivot.updateMatrixWorld(true);
+    group.members.forEach((item) => pivot.attach(item.mesh));
+    return {
+      pivot,
+      pathOffset,
+      startAngle: state.angle
+    };
+  });
+
+  const makePivot = (name, center, names) => {
+    const pivot = new THREE.Group();
+    pivot.name = name;
+    pivot.position.copy(center);
+    animationRoot.add(pivot);
+    pivot.updateMatrixWorld(true);
+    names
+      .map((meshName) => findMesh(meshName))
+      .filter(Boolean)
+      .forEach((mesh) => pivot.attach(mesh));
+    return pivot;
+  };
+
+  const frontPivot = makePivot('BicycleFrontSprocketPivot', frontPivotCenter, [
+    'polySurface796_tire_0',
+    'polySurface796_rim_0',
+    'polySurface796_steel_0',
+    'pCylinder83_rim_0',
+    'pCylinder84_tire_0',
+    'pCylinder5_wheel_0',
+    'pCylinder77_steel_0',
+    'pCylinder81_steel_0',
+    'pCylinder82_steel_0',
+    'pCylinder107_steel_0',
+    'pCylinder108_steel_0',
+    'pasted__pCylinder32_rim_0',
+    'pasted__pCylinder33_rim_0',
+    'pasted__pCylinder34_rim_0',
+    'pasted__pCylinder35_rim_0',
+    'pasted__pCylinder36_rim_0'
+  ]);
+  const rearPivot = makePivot('BicycleRearSprocketPivot', rearPivotCenter, ['pCylinder103_steel_0']);
+
+  let offset = 0;
+  const speed = totalLength * 0.35;
+  const frontPhase = Math.PI / 2 - phi;
+  const rearPhase = (Math.PI / 2 - phi) - (topLength / rearRadius);
+
+  return {
+    update(delta) {
+      offset += speed * delta;
+      frontPivot.rotation.z = -offset / frontRadius + frontPhase;
+      rearPivot.rotation.z = -offset / rearRadius + rearPhase;
+      chainParts.forEach((part) => {
+        const state = getChainState(part.pathOffset + offset);
+        part.pivot.position.copy(state.position);
+        part.pivot.rotation.z = state.angle - part.startAngle;
+      });
+    }
+  };
 }
 
 function applyJeepMaterials(root) {
@@ -1832,6 +2260,7 @@ function showCar(index) {
     if (rickshawPivot) rickshawPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
 
     modelRoot.position.set(0, 0, 0);
     modelRoot.scale.setScalar(1);
@@ -1856,6 +2285,7 @@ function showCar(index) {
     if (rickshawPivot) rickshawPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     jeepPivot.visible = true;
 
     jeepPivot.position.set(0, 0, 0);
@@ -1885,6 +2315,7 @@ function showCar(index) {
     if (rickshawPivot) rickshawPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     bikePivot.visible = true;
 
     // Reset transforms before measuring so we get the bike's natural bbox.
@@ -1921,6 +2352,7 @@ function showCar(index) {
     if (rickshawPivot) rickshawPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     formulaPivot.visible = true;
 
     formulaPivot.position.set(0, 0, 0);
@@ -1953,6 +2385,7 @@ function showCar(index) {
     if (formulaPivot) formulaPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     rickshawPivot.visible = true;
 
     // The GLB was pre-levelled in Blender (fix_rickshaw_ground_plane.py), so
@@ -1986,6 +2419,7 @@ function showCar(index) {
     if (formulaPivot) formulaPivot.visible = false;
     if (rickshawPivot) rickshawPivot.visible = false;
     if (ferrariPivot) ferrariPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     bmwPivot.visible = true;
 
     bmwPivot.position.set(0, 0, 0);
@@ -2016,6 +2450,7 @@ function showCar(index) {
     if (formulaPivot) formulaPivot.visible = false;
     if (rickshawPivot) rickshawPivot.visible = false;
     if (bmwPivot) bmwPivot.visible = false;
+    if (bicyclePivot) bicyclePivot.visible = false;
     ferrariPivot.visible = true;
 
     ferrariPivot.position.set(0, 0, 0);
@@ -2039,6 +2474,42 @@ function showCar(index) {
       -reusableCenter.z * scale
     );
     if (steerStates[index]) steerStates[index].angle = 0;
+  } else if (car.type === 'bicycle') {
+    if (modelRoot) modelRoot.visible = false;
+    if (bikePivot) bikePivot.visible = false;
+    if (jeepPivot) jeepPivot.visible = false;
+    if (formulaPivot) formulaPivot.visible = false;
+    if (rickshawPivot) rickshawPivot.visible = false;
+    if (bmwPivot) bmwPivot.visible = false;
+    if (ferrariPivot) ferrariPivot.visible = false;
+    bicyclePivot.visible = true;
+
+    bicyclePivot.position.set(0, 0, 0);
+    bicyclePivot.scale.setScalar(1);
+    bicyclePivot.quaternion.identity();
+    bicycleRoot.updateMatrixWorld(true);
+    bicyclePivot.updateMatrixWorld(true);
+
+    reusableBox.setFromObject(bicyclePivot);
+    reusableBox.getSize(reusableSize);
+    reusableBox.getCenter(reusableCenter);
+
+    const maxAxis = Math.max(reusableSize.x, reusableSize.y, reusableSize.z) || 1;
+    const scale = targetSize / maxAxis;
+    bicyclePivot.scale.setScalar(scale);
+    bicyclePivot.position.set(
+      -reusableCenter.x * scale,
+      -reusableBox.min.y * scale + 0.05,
+      -reusableCenter.z * scale
+    );
+    if (steerStates[index]) {
+      steerStates[index].angle = 0;
+      steerStates[index].lean = 0;
+    }
+    bicycleWheels.forEach((wheel) => {
+      wheel.spin = 0;
+      wheel.mesh.quaternion.identity();
+    });
   }
 
   carTitle.textContent = car.title;
@@ -2340,6 +2811,11 @@ function updateWheels(delta) {
     return;
   }
 
+  if (car.type === 'bicycle') {
+    updateBicycleAnimation(steer, steerInput, delta);
+    return;
+  }
+
   if (steerInput !== 0) {
     steer.angle = THREE.MathUtils.clamp(
       steer.angle + steerInput * STEER_RATE * delta,
@@ -2443,6 +2919,43 @@ function updateBikePhysics(steer, steerInput, delta, bikeType = 'bike') {
   });
 
 }
+
+function updateBicycleAnimation(steer, steerInput, delta) {
+  if (steerInput !== 0) {
+    steer.angle = THREE.MathUtils.clamp(
+      steer.angle + steerInput * STEER_RATE * delta,
+      -BICYCLE_STEER_MAX,
+      BICYCLE_STEER_MAX
+    );
+  } else if (steer.angle > 0) {
+    steer.angle = Math.max(0, steer.angle - STEER_RETURN_RATE * delta);
+  } else if (steer.angle < 0) {
+    steer.angle = Math.min(0, steer.angle + STEER_RETURN_RATE * delta);
+  }
+
+  const targetLean = steer.angle * (BICYCLE_LEAN_MAX / BICYCLE_STEER_MAX);
+  const leanLerp = 1 - Math.exp(-5 * delta);
+  steer.lean = THREE.MathUtils.lerp(steer.lean, targetLean, leanLerp);
+  if (bicyclePivot && bicycleLeanAxis) {
+    bicyclePivot.quaternion.setFromAxisAngle(bicycleLeanAxis, steer.lean);
+  }
+
+  const TWO_PI = Math.PI * 2;
+  const spinStep = BICYCLE_WHEEL_SPEED * delta;
+  carWheels[activeIndex].forEach((wheel) => {
+    wheel.spin = (wheel.spin + spinStep) % TWO_PI;
+    const axleVec = wheel.axleVec || Z_AXIS;
+    _spinQuat.setFromAxisAngle(axleVec, wheel.spin);
+    if (wheel.isFront) {
+      _steerQuat.setFromAxisAngle(wheel.steerVec || Y_AXIS, (wheel.steerSign || -1) * steer.angle);
+      wheel.mesh.quaternion.copy(_steerQuat).multiply(_spinQuat);
+    } else {
+      wheel.mesh.quaternion.copy(_spinQuat);
+    }
+  });
+  if (bicycleDrivetrain) bicycleDrivetrain.update(delta);
+}
+
 function resize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();

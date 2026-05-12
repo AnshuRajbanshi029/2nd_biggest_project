@@ -1,0 +1,11 @@
+2026-05-11 20:53:06,184 - BlenderMCPServer - INFO - BlenderMCP server starting up
+2026-05-11 20:53:06,186 - blender-mcp-telemetry - WARNING - Telemetry disabled via environment variable
+2026-05-11 20:53:06,192 - BlenderMCPServer - INFO - Connected to Blender at localhost:9876
+2026-05-11 20:53:06,192 - BlenderMCPServer - INFO - Created new persistent connection to Blender
+2026-05-11 20:53:06,193 - BlenderMCPServer - INFO - Successfully connected to Blender on startup
+2026-05-11 21:59:21,185 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: expected value at line 1 column 1 [type=json_invalid, input_value='Get-Command python -Erro...tion SilentlyContinue\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
+2026-05-11 21:59:26,178 - mcp.server.lowlevel.server - ERROR - Received exception from stream: 1 validation error for JSONRPCMessage
+  Invalid JSON: expected value at line 1 column 1 [type=json_invalid, input_value='csc\x01l\n', input_type=str]
+    For further information visit https://errors.pydantic.dev/2.13/v/json_invalid
